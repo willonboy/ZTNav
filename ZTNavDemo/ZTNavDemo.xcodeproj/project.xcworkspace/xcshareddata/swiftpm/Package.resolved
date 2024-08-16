@@ -1,0 +1,15 @@
+{
+  "originHash" : "145387c5e12b879487bfd9634f070fb09953bb551ab8b005490c3c4a07d41795",
+  "pins" : [
+    {
+      "identity" : "ztchain",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/willonboy/ZTChain",
+      "state" : {
+        "branch" : "main",
+        "revision" : "42c7e142f88d4fac9b0cf934cfc46d1a70585ce0"
+      }
+    }
+  ],
+  "version" : 3
+}
