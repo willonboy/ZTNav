@@ -2,8 +2,6 @@
 //  Mine.swift
 //  ZTNavDemo
 //
-//  Created by zt on 2024/8/16.
-//
 
 import UIKit
 
@@ -17,7 +15,7 @@ class MineVC: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        self.view.backgroundColor = .purple
         _ = self.zt.title("Mine ViewControll").subject
     }
 

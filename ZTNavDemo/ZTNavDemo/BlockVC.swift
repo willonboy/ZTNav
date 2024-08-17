@@ -2,8 +2,6 @@
 //  BlockVC.swift
 //  ZTNavDemo
 //
-//  Created by zt on 2024/8/16.
-//
 
 import UIKit
 
@@ -17,7 +15,7 @@ class BlockVC: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        self.view.backgroundColor = .systemYellow
         _ = self.zt.title("Mall ViewControll").subject
     }
 

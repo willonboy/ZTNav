@@ -27,52 +27,90 @@ public struct ZTNavParameters {
     }
 }
 
-// 不要让Native代码感知到web url，所有的web url都转成appUrl，即Native Schema
-public enum ZTNavPath : Hashable {
-    case unknown(String)
+public class ZTNavLog {
+    public enum LogLevel {
+        case Error, Warning, Info
+    }
+    public static var log:((LogLevel, String) -> Void) = {level, msg in
+        debugPrint("ZTNav \(level) : " + msg)
+    }
+}
+
+
+public protocol ZTNavPathProtocol {}
+
+extension String : ZTNavPathProtocol {}
+
+// Do not let native code perceive web URLs; convert all web URLs to appUrl, which is the native schema
+public enum ZTNavPath : ZTNavPathProtocol, Hashable {
     case web(String)
-    // Native路径不要用路径模板，Native代码只简单的 "key + params => vc/logic code"
+    // Native paths should not use path templates; native code simply uses "key + params => vc/logic code"
     case appUrl(String)
+    case ignore
 }
 
 public struct ZTNavVerifyParam {
-    var name: String
+    public enum Key {
+        case key(String)
+
+        var name: String {
+            switch self {
+            case .key(let name):
+                return name
+            }
+        }
+    }
+    var key: Key
     var type: Any.Type
     var defValue: Any?
 }
 
-protocol ZTNavHandler {
-    var path: ZTNavPath { get set }
-    var verifyParams: [ZTNavVerifyParam] { get set }
+public protocol ZTNavHandler {
+    var path: ZTNavPath { get }
+    var verifyParams: [ZTNavVerifyParam] { get }
 }
 
 extension ZTNavHandler {
     
     @discardableResult
-    func validateParams(_ params: inout [String: Any]) -> Bool {
+    func validateParams(_ params: [String: Any]) -> Bool {
         for vp in verifyParams {
-            if let value = params[vp.name] {
+            if let value = params[vp.key.name] {
                 if type(of: value) != vp.type {
-                    debugPrint("ZTNav Error: validateParams failed: param value type wrong of \(vp.name) : \(value)")
+                    ZTNavLog.log(.Error, "validateParams failed: Incorrect value type for parameter '\(vp.key)'. Expected \(vp.type), but got \(type(of: value)).")
                     return false
                 }
-            } else if let defaultValue = vp.defValue {
-                params[vp.name] = defaultValue
             } else {
-                debugPrint("ZTNav Error: validateParams failed: no param \(vp.name)")
+                if vp.defValue != nil {
+                    continue
+                }
+                ZTNavLog.log(.Error, "validateParams failed: Missing parameter \(vp.key)")
                 return false
             }
         }
         return true
     }
+    
+    func bindParamsDefaultValue(_ params: [String: Any]) -> [String: Any] {
+        var combinedParams = params
+        for vp in verifyParams {
+            if params.keys.contains(vp.key.name) == false, let defaultValue = vp.defValue {
+                combinedParams[vp.key.name] = defaultValue
+            }
+        }
+        return combinedParams
+    }
 }
 
 public class ZTVCHandler : ZTNavHandler {
-    var path: ZTNavPath
-    var verifyParams: [ZTNavVerifyParam]
-    var handler: (ZTNavParameters) -> UIViewController
+    private(set) public var path: ZTNavPath
+    private(set) public var verifyParams: [ZTNavVerifyParam]
+    private(set) var handler: (ZTNavParameters) -> UIViewController
 
     init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> UIViewController) {
+        if case .appUrl = path {} else {
+            ZTNavLog.log(.Error, "ZTVCHandler path must be appUrl")
+        }
         self.path = path
         self.verifyParams = verifyParams
         self.handler = handler
@@ -85,11 +123,14 @@ public class ZTVCHandler : ZTNavHandler {
 }
 
 public class ZTLogicHandler : ZTNavHandler {
-    var path: ZTNavPath
-    var verifyParams: [ZTNavVerifyParam]
-    var handler: (ZTNavParameters) -> Void
+    private(set) public var path: ZTNavPath
+    private(set) public var verifyParams: [ZTNavVerifyParam]
+    private(set) var handler: (ZTNavParameters) -> Void
 
     init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> Void) {
+        if case .appUrl = path {} else {
+            ZTNavLog.log(.Error, "ZTLogicHandler path must be appUrl")
+        }
         self.path = path
         self.verifyParams = verifyParams
         self.handler = handler
@@ -101,67 +142,59 @@ public class ZTLogicHandler : ZTNavHandler {
     }
 }
 
-// 必须统一注册
-public class ZTNavMiddleware {
-    let name: String
-    let process: (String, [String: Any]) -> (String, [String: Any])
-
-    init(name: String, process: @escaping (String, [String: Any]) -> (String, [String: Any])) {
-        self.name = name
-        self.process = process
-    }
-    
-    @MainActor
-    func regist() {
-        ZTNav.regist(middleware: self)
-    }
-}
-
 @MainActor
 public class ZTNav {
-    public static var AppSchema: String = "//"
+    public static var AppSchema: String = "//" {
+        willSet {
+            if (newValue.hasPrefix("http") || newValue.hasPrefix("ftp")) {
+                ZTNavLog.log(.Error, "Invalid AppSchema => \(newValue)")
+            }
+        }
+    }
     private(set) public static var navigationController: UINavigationController?
-    private static var failedHandler: ((String, [String: Any]?) -> Void)? = { (url: String, params: [String: Any]?) in
-        debugPrint("ZTNav Error: Navigation failed for URL: \(url) With params: \(params ?? [:])")
+    private static var failedHandler: ((ZTNavPathProtocol, [String: Any]?) -> Void)? = { (path: ZTNavPathProtocol, params: [String: Any]?) in
+        ZTNavLog.log(.Error, "Navigation failed for URL: \(path) with params: \(params ?? [:])")
     }
     private static var middlewares = [ZTNavMiddleware]()
     private static var vcHandlers = [ZTNavPath: ZTVCHandler]()
     private static var logicHandlers = [ZTNavPath: ZTLogicHandler]()
 
-    static func navVC(_ navVC: UINavigationController?) {
+    public static func navVC(_ navVC: UINavigationController?) {
         navigationController = navVC
     }
 
-    static func failedHandler(_ handler: @escaping (String, [String: Any]?) -> Void) {
+    public static func failedHandler(_ handler: @escaping (ZTNavPathProtocol, [String: Any]?) -> Void) {
         failedHandler = handler
     }
 
-    static func allMiddle() -> [ZTNavMiddleware] {
+    public static func allMiddle() -> [ZTNavMiddleware] {
         return middlewares
     }
 
-    static func allHandler() -> [Any] {
+    public static func allHandler() -> [Any] {
         return Array(vcHandlers.values) + Array(logicHandlers.values)
     }
 
     @discardableResult
-    static func push(_ path: ZTNavPath, params: [String: Any] = [:], animated: Bool) -> Bool {
+    public static func push(_ path: ZTNavPathProtocol, params: [String: Any] = [:], animated: Bool) -> Bool {
         guard navigationController != nil else {
-            debugPrint("ZTNav Error: No navigationController")
+            ZTNavLog.log(.Error, "Missing navigationController")
+            failedHandler?(path, params)
             return false
         }
-        guard let vc = loadVC(path, params: params) else {
-            failedHandler?(pathToString(path), params)
+        guard let vc = matchVC(path, params: params) else {
+            failedHandler?(path, params)
             return false
         }
+        
         navigationController?.pushViewController(vc, animated: animated)
         return true
     }
 
     @discardableResult
-    static func present(_ path: ZTNavPath, params: [String: Any] = [:], animated: Bool) -> Bool {
-        guard let vc = loadVC(path, params: params) else {
-            failedHandler?(pathToString(path), params)
+    public static func present(_ path: ZTNavPathProtocol, params: [String: Any] = [:], animated: Bool) -> Bool {
+        guard let vc = matchVC(path, params: params) else {
+            failedHandler?(path, params)
             return false
         }
         if let nv = navigationController {
@@ -173,24 +206,49 @@ public class ZTNav {
     }
 
     @discardableResult
-    static func handle(_ path: ZTNavPath, params: [String: Any] = [:]) -> Bool {
-        guard let (processedPath, combinedParams) = applyMiddlewares(to: path, params: params), validateParams(for: processedPath, params: combinedParams) else {
-            failedHandler?(pathToString(path), params)
+    public static func handle(_ path: ZTNavPathProtocol, params: [String: Any] = [:], animated: Bool = true) -> Bool {
+        guard let navPath = tryTransNavPath(path) else {
+            failedHandler?(path, params)
             return false
         }
-        if let processedPath = processedPath, let result = handleLogic(for: processedPath, params: params) {
-            return result
+        let (processedPath, mParams) = applyMiddlewares(to: navPath, params: params)
+        if case .ignore = processedPath {
+            ZTNavLog.log(.Warning, "`handle` Ignore url: \(path) params: \(params)")
+            return false
         }
-        return push(path, params: params, animated: false)
+        guard canHandle(for: processedPath, params: mParams) else {
+            failedHandler?(path, params)
+            return false
+        }
+        
+        let handler:ZTNavHandler = vcHandlers[processedPath] ?? logicHandlers[processedPath]!
+        if let logicHandler = handler as? ZTLogicHandler {
+            let combinedParams = logicHandler.bindParamsDefaultValue(mParams)
+            logicHandler.handler(ZTNavParameters(params: combinedParams))
+        } else {
+            let vcHandler = handler as! ZTVCHandler
+            let combinedParams = vcHandler.bindParamsDefaultValue(params)
+            let vc = vcHandler.handler(ZTNavParameters(params: combinedParams))
+            navigationController?.pushViewController(vc, animated: animated)
+        }
+        return true
     }
 
-    static func loadVC(_ path: ZTNavPath?, params: [String: Any] = [:]) -> UIViewController? {
-        guard let path = path else { return nil }
-        guard let (processedPath, combinedParams) = applyMiddlewares(to: path, params: params), validateParams(for: processedPath, params: combinedParams) else { return nil}
-        guard let processedPath = processedPath, let vcHandler = vcHandlers[processedPath] else { return nil }
-        var validatedParams = params
-        vcHandler.validateParams(&validatedParams)
-        return vcHandler.handler(ZTNavParameters(params: validatedParams))
+    public static func matchVC(_ path: ZTNavPathProtocol, params: [String: Any] = [:]) -> UIViewController? {
+        guard let navPath = tryTransNavPath(path) else {
+            failedHandler?(path, params)
+            return nil
+        }
+        let (processedPath, mParams) = applyMiddlewares(to: navPath, params: params)
+        if case .ignore = processedPath {
+            ZTNavLog.log(.Warning, "`matchVC` Ignore url: \(path) params: \(params)")
+            return nil
+        }
+        guard canHandle(for: processedPath, params: mParams) else { return nil}
+        guard let vcHandler = vcHandlers[processedPath] else { return nil }
+        
+        let combinedParams = vcHandler.bindParamsDefaultValue(params)
+        return vcHandler.handler(ZTNavParameters(params: combinedParams))
     }
 
     static func regist(vcHandler: ZTVCHandler) {
@@ -200,7 +258,7 @@ public class ZTNav {
 #endif
             return
         }
-        debugPrint("ZTNav regist vcHandler: \(vcHandler.path)")
+        ZTNavLog.log(.Info, "vcHandler: \(vcHandler.path)")
         vcHandlers[vcHandler.path] = vcHandler
     }
 
@@ -211,52 +269,69 @@ public class ZTNav {
 #endif
             return
         }
-        debugPrint("ZTNav regist logicHandler: \(logicHandler.path)")
+        ZTNavLog.log(.Info, "regist logicHandler: \(logicHandler.path)")
         logicHandlers[logicHandler.path] = logicHandler
     }
     
-    static func regist(middleware: ZTNavMiddleware) {
+    public static func regist(middleware: ZTNavMiddleware) {
         guard !middlewares.contains(where: { $0.name == middleware.name }) else {
 #if DEBUG
         assert(false, "ZTNav Error: middleware with name \(middleware.name) already registered")
 #endif
             return
         }
-        debugPrint("ZTNav regist middleware: \(middleware.name)")
+        ZTNavLog.log(.Info, "regist middleware: \(middleware.name)")
         middlewares.append(middleware)
     }
     
-    static func unregist(vcHandler: ZTVCHandler) {
+    public static func unregist(vcHandler: ZTVCHandler) {
         vcHandlers.removeValue(forKey: vcHandler.path)
-        debugPrint("ZTNav unregist vcHandler: \(vcHandler.path)")
+        ZTNavLog.log(.Info, "unregist vcHandler: \(vcHandler.path)")
     }
 
-    static func unregist(logicHandler: ZTLogicHandler) {
+    public static func unregist(logicHandler: ZTLogicHandler) {
         logicHandlers.removeValue(forKey: logicHandler.path)
-        debugPrint("ZTNav unregist logicHandler: \(logicHandler.path)")
+        ZTNavLog.log(.Info, "unregist logicHandler: \(logicHandler.path)")
     }
 
-    static func unregist(name: String) {
+    public static func unregist(name: String) {
         middlewares.removeAll { $0.name == name }
-        debugPrint("ZTNav unregist middleware: \(name)")
+        ZTNavLog.log(.Info, "unregist middleware: \(name)")
     }
 
-    private static func applyMiddlewares(to path: ZTNavPath, params: [String: Any]) -> (ZTNavPath?, [String: Any])? {
-        var url = pathToString(path)
-        var combinedParams = parseQueryParameters(from: url)
+    private static func applyMiddlewares(to path: ZTNavPath, params: [String: Any]) -> (ZTNavPath, [String: Any]) {
+        if case .ignore = path {
+            return (path, params)
+        }
+        var combinedParams = parseQueryParameters(from: path)
         combinedParams.merge(params) { (_, new) in new }
+        var mPath = path
         
         for middleware in middlewares {
-            debugPrint("ZTNav call middleware: \(middleware.name) \nurl: \(url) \nparams: \(combinedParams)")
-            (url, combinedParams) = middleware.process(url, combinedParams)
+            ZTNavLog.log(.Info, "will call middleware: \(middleware.name) url: \(mPath) params: \(combinedParams)")
+            (mPath, combinedParams) = middleware.process(mPath, combinedParams)
+            ZTNavLog.log(.Info, "did call middleware: \(middleware.name) url: \(mPath) params: \(combinedParams)")
         }
         
-        return (stringToPath(url), combinedParams)
+        if case .appUrl = mPath {} else if case .ignore = mPath {
+            ZTNavLog.log(.Warning, "middleware ignore url: \(path) params: \(params)")
+        } else {
+            ZTNavLog.log(.Error, "The path processed by middleware cannot be a web path.")
+        }
+        return (mPath, combinedParams)
     }
     
-    private static func parseQueryParameters(from url: String) -> [String: Any] {
+    private static func parseQueryParameters(from path: ZTNavPath) -> [String: Any] {
+        if case .ignore = path {
+            return [:]
+        }
+        let url = switch path {
+        case .web(let urlStr), .appUrl(let urlStr):
+            urlStr
+        case .ignore:
+            ""
+        }
         var params = [String: Any]()
-        
         if let components = URLComponents(string: url), let queryItems = components.queryItems {
             for item in queryItems {
                 if let value = item.value?.removingPercentEncoding {
@@ -266,59 +341,36 @@ public class ZTNav {
                 }
             }
         }
-        
         return params
     }
     
-    private static func validateParams(for path: ZTNavPath?, params: [String: Any]) -> Bool {
-        guard let path = path else { return false }
-        
-        for handler in vcHandlers.values {
-            if handler.path == path {
-                var validatedParams = params
-                if !handler.validateParams(&validatedParams) {
-                    return false
-                }
-                return true
-            }
-        }
-
-        for handler in logicHandlers.values {
-            if handler.path == path {
-                var validatedParams = params
-                if !handler.validateParams(&validatedParams) {
-                    return false
-                }
-                return true
-            }
+    private static func canHandle(for path: ZTNavPath, params: [String: Any]) -> Bool {
+        guard let handler:ZTNavHandler = vcHandlers[path] ?? logicHandlers[path] else {
+            ZTNavLog.log(.Info, "Can't handle \(path) params:\(params)")
+            return false
         }
         
-        return false
+        let result = handler.validateParams(params)
+        ZTNavLog.log(.Info, "\(result ? "Can": "Can't") handle \(path) params:\(params)")
+        return result
     }
-
-    private static func handleLogic(for path: ZTNavPath, params: [String: Any]) -> Bool? {
-        guard let logicHandler = logicHandlers[path] else { return nil }
-        var validatedParams = params
-        logicHandler.validateParams(&validatedParams)
-        logicHandler.handler(ZTNavParameters(params: validatedParams))
-        return true
-    }
-
-    private static func pathToString(_ path: ZTNavPath) -> String {
-        switch path {
-        case .unknown(let url), .web(let url), .appUrl(let url):
-            return url
+    
+    private static func tryTransNavPath(_ path: ZTNavPathProtocol) -> ZTNavPath? {
+        if let p = path as? ZTNavPath {
+            return p
         }
+        if let stringPath = path as? String {
+            return stringToPath(stringPath)
+        }
+        ZTNavLog.log(.Error, "Invalid path type")
+        return nil
     }
 
-    private static func stringToPath(_ string: String) -> ZTNavPath? {
-        if string.hasPrefix("http") {
-            return .web(string)
-        } else if string.hasPrefix(AppSchema) {
+    private static func stringToPath(_ string: String) -> ZTNavPath {
+        if string.hasPrefix(AppSchema) {
             return .appUrl(string)
-        } else {
-            return .unknown(string)
-        }
+        } 
+        return .web(string)
     }
 }
 

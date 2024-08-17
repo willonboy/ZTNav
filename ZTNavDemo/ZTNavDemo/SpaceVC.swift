@@ -2,8 +2,6 @@
 //  Space.swift
 //  ZTNavDemo
 //
-//  Created by zt on 2024/8/16.
-//
 
 import UIKit
 
@@ -20,7 +18,7 @@ class SpaceVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        self.view.backgroundColor = .systemPink
         _ = self.zt.title("Space ViewControll").subject
     }
 

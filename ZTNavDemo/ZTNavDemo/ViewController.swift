@@ -2,8 +2,6 @@
 //  ViewController.swift
 //  ZTNavDemo
 //
-//  Created by zt on 2024/8/16.
-//
 
 import UIKit
 
@@ -18,7 +16,7 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        self.view.backgroundColor = .white
         _ = self.zt.title("Root ViewControll").subject
     }
 
