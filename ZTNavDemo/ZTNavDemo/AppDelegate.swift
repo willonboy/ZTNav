@@ -27,6 +27,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         registVcHandlers()
         
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 1) {
+            ZTNav.handle(MallRouter.mall, params: ["param1": "mall_id_2847","param2": "Mall name"])
+        }
+        
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 3) {
             ZTNav.handle("http://example.com/mall?param1=value1&param2=value2")
         }
@@ -217,7 +221,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 .init(key: .mallName, type: String.self, defValue: "default")
             ],
             handler: { params in
-                MallVC()
+                if let mallId = params[dynamicMember: MallRouter.Keys.mallId.name] as? String {
+                    print("mallId: \(mallId)")
+                }
+                if let mallName = params[dynamicMember: ZTNavVerifyParam.Key.mallName.name] as? String {
+                    print("mallName: \(mallName)")
+                }
+                return MallVC()
             }
         ).regist()
         
