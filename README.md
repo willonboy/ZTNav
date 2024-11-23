@@ -20,7 +20,7 @@ You can also use Swift Package Manager to integrate ZTNav into your Xcode projec
 
 ```swift
 dependencies: [
-.package(url: "https://github.com/willonboy/ZTNav.git", from: "0.1.0")
+.package(url: "https://github.com/willonboy/ZTNav.git", from: "0.2.0")
 ]
 ```
 

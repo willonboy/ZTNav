@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'ZTNav'
-  s.version          = '0.1.0'
+  s.version          = '0.2.0'
   s.summary          = 'ZTNav is a lightweight and flexible navigation management system for iOS applications that abstracts away direct URL handling.'
 
   s.description      = <<-DESC
