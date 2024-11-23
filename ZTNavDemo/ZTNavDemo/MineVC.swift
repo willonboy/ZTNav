@@ -16,7 +16,7 @@ class MineVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.view.backgroundColor = .purple
-        _ = self.zt.title("Mine ViewControll").subject
+        self.zt.title("Mine ViewControll").build()
     }
 
 }

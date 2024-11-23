@@ -121,6 +121,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }.regist()
 
         ZTNavMiddleware(name: "AppSchemaProcessMiddleward") {
+            /*
+            ZTNavMiddleware(name: "ParseIgnoreMiddleware") { path, params in
+                guard case .appUrl(let p) = path else {
+                    return (path, params)
+                }
+
+                if p != "app://link/blocked" { return (path, params) }
+                return (.ignore, params)
+            }
+             */
+            
             ZTNavMiddleware(name: "RemoveAppSchemaPrefix") { path, params in
                 guard case .appUrl(let url) = path else {
                     return (path, params)
@@ -136,6 +147,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             
             ZTNavMiddleware(name: "AppSchemaOtherMiddleward") {
                 ZTNavMiddleware(name: "ParseQueryParamMiddleware") { path, params in
+                    if case .ignore = path { return (path, params) }
                     let url = switch path {
                     case .web(let urlStr), .appUrl(let urlStr):
                         urlStr
@@ -162,7 +174,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 
                 ZTNavMiddleware(name: "ParseIgnoreMiddleware") { path, params in
                     if case .ignore = path {
-                        return (.ignore, params)
+                        return (path, params)
                     }
                     let url = switch path {
                     case .web(let urlStr), .appUrl(let urlStr):

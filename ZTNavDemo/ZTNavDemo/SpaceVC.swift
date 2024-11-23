@@ -19,7 +19,7 @@ class SpaceVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.view.backgroundColor = .systemPink
-        _ = self.zt.title("Space ViewControll").subject
+        self.zt.title("Space ViewControll").build()
     }
 
 }

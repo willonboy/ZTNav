@@ -17,7 +17,7 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.view.backgroundColor = .white
-        _ = self.zt.title("Root ViewControll").subject
+        self.zt.title("Root ViewControll").build()
     }
 
 }

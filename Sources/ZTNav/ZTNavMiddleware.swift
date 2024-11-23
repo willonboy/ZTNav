@@ -13,24 +13,24 @@
 import Foundation
 
 @resultBuilder
-struct ZTNavMiddlewareBuilder {
-    static func buildBlock(_ middlewares: ZTNavMiddleware...) -> [ZTNavMiddleware] {
+public struct ZTNavMiddlewareBuilder {
+    public static func buildBlock(_ middlewares: ZTNavMiddleware...) -> [ZTNavMiddleware] {
         return middlewares
     }
 
-    static func buildOptional(_ middleware: [ZTNavMiddleware]?) -> [ZTNavMiddleware] {
+    public static func buildOptional(_ middleware: [ZTNavMiddleware]?) -> [ZTNavMiddleware] {
         return middleware ?? []
     }
 
-    static func buildEither(first: [ZTNavMiddleware]) -> [ZTNavMiddleware] {
+    public static func buildEither(first: [ZTNavMiddleware]) -> [ZTNavMiddleware] {
         return first
     }
 
-    static func buildEither(second: [ZTNavMiddleware]) -> [ZTNavMiddleware] {
+    public static func buildEither(second: [ZTNavMiddleware]) -> [ZTNavMiddleware] {
         return second
     }
 
-    static func buildArray(_ components: [[ZTNavMiddleware]]) -> [ZTNavMiddleware] {
+    public static func buildArray(_ components: [[ZTNavMiddleware]]) -> [ZTNavMiddleware] {
         return components.flatMap { $0 }
     }
 }
@@ -54,19 +54,19 @@ public class ZTNavMiddleware {
     }
 
     // Regular initializer
-    init(name: String, process: @escaping (ZTNavPath, [String: Any]) -> (ZTNavPath, [String: Any])) {
+    public init(name: String, process: @escaping (ZTNavPath, [String: Any]) -> (ZTNavPath, [String: Any])) {
         self.name = name
         self.process = process
     }
 
     // Nested middleware initializer
-    init(name: String, @ZTNavMiddlewareBuilder _ content: () -> [ZTNavMiddleware]) {
+    public init(name: String, @ZTNavMiddlewareBuilder _ content: () -> [ZTNavMiddleware]) {
         self.name = name
         self.middlewares = content()
     }
     
     @MainActor
-    func regist() {
+    public func regist() {
         ZTNav.regist(middleware: self)
     }
 }

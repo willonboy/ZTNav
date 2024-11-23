@@ -29,7 +29,7 @@ class MallVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.view.backgroundColor = .systemGray2
-        _ = self.zt.title("Mall ViewControll").subject
+        self.zt.title("Mall ViewControll").build()
     }
 
 }

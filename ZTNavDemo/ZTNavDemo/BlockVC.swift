@@ -16,7 +16,7 @@ class BlockVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.view.backgroundColor = .systemYellow
-        _ = self.zt.title("Mall ViewControll").subject
+        self.zt.title("Mall ViewControll").build()
     }
 
 }

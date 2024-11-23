@@ -1,5 +1,4 @@
 {
-  "originHash" : "145387c5e12b879487bfd9634f070fb09953bb551ab8b005490c3c4a07d41795",
   "pins" : [
     {
       "identity" : "ztchain",
@@ -7,9 +6,9 @@
       "location" : "https://github.com/willonboy/ZTChain",
       "state" : {
         "branch" : "main",
-        "revision" : "42c7e142f88d4fac9b0cf934cfc46d1a70585ce0"
+        "revision" : "5d295f987c835f0e207ffcbc3e6ea0c76106c767"
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }

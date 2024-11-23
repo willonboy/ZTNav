@@ -107,9 +107,12 @@ public class ZTVCHandler : ZTNavHandler {
     private(set) public var verifyParams: [ZTNavVerifyParam]
     private(set) var handler: (ZTNavParameters) -> UIViewController
 
-    init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> UIViewController) {
+    public init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> UIViewController) {
         if case .appUrl = path {} else {
             ZTNavLog.log(.Error, "ZTVCHandler path must be appUrl")
+#if DEBUG
+            assert(false)
+#endif
         }
         self.path = path
         self.verifyParams = verifyParams
@@ -117,7 +120,7 @@ public class ZTVCHandler : ZTNavHandler {
     }
 
     @MainActor
-    func regist() {
+    public func regist() {
         ZTNav.regist(vcHandler: self)
     }
 }
@@ -127,9 +130,12 @@ public class ZTLogicHandler : ZTNavHandler {
     private(set) public var verifyParams: [ZTNavVerifyParam]
     private(set) var handler: (ZTNavParameters) -> Void
 
-    init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> Void) {
+    public init(path: ZTNavPath, verifyParams: [ZTNavVerifyParam] = [], handler: @escaping (ZTNavParameters) -> Void) {
         if case .appUrl = path {} else {
             ZTNavLog.log(.Error, "ZTLogicHandler path must be appUrl")
+#if DEBUG
+            assert(false)
+#endif
         }
         self.path = path
         self.verifyParams = verifyParams
@@ -137,7 +143,7 @@ public class ZTLogicHandler : ZTNavHandler {
     }
 
     @MainActor
-    func regist() {
+    public func regist() {
         ZTNav.regist(logicHandler: self)
     }
 }
@@ -146,7 +152,9 @@ public class ZTLogicHandler : ZTNavHandler {
 public class ZTNav {
     public static var AppSchema: String = "//" {
         willSet {
-            if (newValue.hasPrefix("http") || newValue.hasPrefix("ftp")) {
+            if (newValue.hasPrefix("http")
+                || newValue.hasPrefix("ftp")
+                || newValue.hasPrefix("file")) {
                 ZTNavLog.log(.Error, "Invalid AppSchema => \(newValue)")
             }
         }
@@ -258,7 +266,7 @@ public class ZTNav {
 #endif
             return
         }
-        ZTNavLog.log(.Info, "vcHandler: \(vcHandler.path)")
+        ZTNavLog.log(.Info, "regist vcHandler: \(vcHandler.path)")
         vcHandlers[vcHandler.path] = vcHandler
     }
 
@@ -317,6 +325,9 @@ public class ZTNav {
             ZTNavLog.log(.Warning, "middleware ignore url: \(path) params: \(params)")
         } else {
             ZTNavLog.log(.Error, "The path processed by middleware cannot be a web path.")
+#if DEBUG
+            assert(false)
+#endif
         }
         return (mPath, combinedParams)
     }
